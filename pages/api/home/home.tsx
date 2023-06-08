@@ -259,15 +259,18 @@ const Home = ({
       });
     }
 
-    const apiKey = localStorage.getItem('apiKey');
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (apiKey) {
+        dispatch({ field: 'apiKey', value: apiKey });
+      }
 
-    if (serverSideApiKeyIsSet) {
-      dispatch({ field: 'apiKey', value: '' });
+    // if (serverSideApiKeyIsSet) {
+    //   dispatch({ field: 'apiKey', value: '' });
 
-      localStorage.removeItem('apiKey');
-    } else if (apiKey) {
-      dispatch({ field: 'apiKey', value: apiKey });
-    }
+    //   localStorage.removeItem('apiKey');
+    // } else if (apiKey) {
+    //   dispatch({ field: 'apiKey', value: apiKey });
+    // }
 
     const pluginKeys = localStorage.getItem('pluginKeys');
     if (serverSidePluginKeysSet) {
