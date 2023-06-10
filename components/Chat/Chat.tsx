@@ -116,6 +116,7 @@ export const Chat = memo(({ stopConversationRef }: Props) => {
           });
         }
         const controller = new AbortController();
+        console.log('endpoint', endpoint);
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -124,6 +125,8 @@ export const Chat = memo(({ stopConversationRef }: Props) => {
           signal: controller.signal,
           body,
         });
+
+        console.log('response', response);
         if (!response.ok) {
           homeDispatch({ field: 'loading', value: false });
           homeDispatch({ field: 'messageIsStreaming', value: false });
