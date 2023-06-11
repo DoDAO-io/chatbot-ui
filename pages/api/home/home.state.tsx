@@ -49,6 +49,6 @@ export const initialState: HomeInitialState = {
   messageError: false,
   searchTerm: '',
   defaultModelId: undefined,
-  serverSideApiKeyIsSet: false,
+  serverSideApiKeyIsSet: true,
   serverSidePluginKeysSet: false,
 };

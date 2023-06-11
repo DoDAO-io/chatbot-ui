@@ -146,7 +146,7 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
 
-"@dqbd/tiktoken@^1.0.2":
+"@dqbd/tiktoken@^1.0.7":
   version "1.0.7"
   resolved "https://registry.yarnpkg.com/@dqbd/tiktoken/-/tiktoken-1.0.7.tgz#612871cf91eba5599c804f100c573aa4d8596f57"
   integrity sha512-bhR5k5W+8GLzysjk8zTMVygQZsgvf7W1F0IlL4ZQ5ugjo5rCyiwGM5d8DYriXspytfu98tv59niang3/T+FoDw==
@@ -297,6 +297,11 @@
   version "3.0.6"
   resolved "https://registry.yarnpkg.com/@fortaine/fetch-event-source/-/fetch-event-source-3.0.6.tgz#b8552a2ca2c5202f5699b93a92be0188d422b06e"
   integrity sha512-621GAuLMvKtyZQ3IA6nlDWhV1V/7PGOTNIGLUifxt0KzM+dZIweJ6F3XvQF3QnqeNfS1N7WQ0Kil1Di/lhChEw==
+
+"@huggingface/inference@^2.5.1":
+  version "2.5.1"
+  resolved "https://registry.yarnpkg.com/@huggingface/inference/-/inference-2.5.1.tgz#13824db5823edf241be2acb8e548097c94b39187"
+  integrity sha512-5Jx+cwRYrGtvN/27VJbzEcjFlFR7ixd+jNC/hbjcRDSZ3QteEUVKwMCgXplwjWkQbvoeWik+reR2m5fAWUvvpw==
 
 "@humanwhocodes/config-array@^0.11.8":
   version "0.11.10"
@@ -1246,6 +1251,11 @@ cliui@^7.0.2:
     string-width "^4.2.0"
     strip-ansi "^6.0.0"
     wrap-ansi "^7.0.0"
+
+cohere-ai@^6.2.2:
+  version "6.2.2"
+  resolved "https://registry.yarnpkg.com/cohere-ai/-/cohere-ai-6.2.2.tgz#ea3a01d5bad839ffb006e8ec793c034a951cca7e"
+  integrity sha512-+Tq+4e8N/YWKJqFpWaULsfbZR/GOvGh8WWYFKR1bpipu8bCok3VcbTPnBmIToQiIqOgFpGk3HsA4b0guVyL3vg==
 
 color-convert@^1.9.0:
   version "1.9.3"
@@ -2978,10 +2988,10 @@ kleur@^4.0.3:
   resolved "https://registry.yarnpkg.com/kleur/-/kleur-4.1.5.tgz#95106101795f7050c6c650f350c683febddb1780"
   integrity sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==
 
-langchain@^0.0.92:
-  version "0.0.92"
-  resolved "https://registry.yarnpkg.com/langchain/-/langchain-0.0.92.tgz#235c201dd6007d317e82f644095722f1fa2cb5ae"
-  integrity sha512-77528kXJu9C391qV1a5jDzZLEjIblq/VtpH7xd4BwavgvhRmeSXR9WkrHHmih/Phpae4Ss3dtb7pcyd78rp/YA==
+langchain@^0.0.85:
+  version "0.0.85"
+  resolved "https://registry.yarnpkg.com/langchain/-/langchain-0.0.85.tgz#21f5822e38c44543ce14ef46b048f8ce8d288000"
+  integrity sha512-GssYCXYJtsBhBSBGxMEZB9e3OdCAWMWDpiqcHjzMlDi5vxWs47NZERjRIkc5b7qG03EeWVK6XuDGFNt6egCafw==
   dependencies:
     "@anthropic-ai/sdk" "^0.4.3"
     ansi-styles "^5.0.0"
@@ -4514,6 +4524,11 @@ remove-accents@0.4.2:
   version "0.4.2"
   resolved "https://registry.yarnpkg.com/remove-accents/-/remove-accents-0.4.2.tgz#0a43d3aaae1e80db919e07ae254b285d9e1c7bb5"
   integrity sha512-7pXIJqJOq5tFgG1A2Zxti3Ht8jJF337m4sowbuHsW30ZnkQFnDzy9qBNhgzX8ZLW4+UBcXiiR7SwR6pokHsxiA==
+
+replicate@^0.12.2:
+  version "0.12.2"
+  resolved "https://registry.yarnpkg.com/replicate/-/replicate-0.12.2.tgz#c999ad098c81f7face09d0d9956fe5359d2830bf"
+  integrity sha512-n2divuzB+LzN1hiLWmcOqXQCsvKQX6XDVuOVQzA3Jwjh4ZIkl584HjQgoJnr6o5FXE4iTBFwBQd4L7nBTYZoGA==
 
 require-directory@^2.1.1:
   version "2.1.1"

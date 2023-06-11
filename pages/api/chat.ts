@@ -1,25 +1,21 @@
-import {getMatchesFromEmbeddings, Metadata} from "@/pages/api/matches";
-import {summarizeLongDocument} from "@/pages/api/summarizer";
-import {templates} from "@/pages/api/templates";
+import { NextApiRequest, NextApiResponse } from 'next';
 
-import {ChatBody, Message} from '@/types/chat';
-import {DEFAULT_TEMPERATURE} from '@/utils/app/const';
-import {OpenAIError, OpenAIStream} from '@/utils/server';
+import { DEFAULT_TEMPERATURE } from '@/utils/app/const';
+import { OpenAIError, OpenAIStream } from '@/utils/server';
 
-import tiktokenModel from '@dqbd/tiktoken/encoders/cl100k_base.json';
-import {init, Tiktoken} from '@dqbd/tiktoken/lite/init';
-import {PineconeClient} from "@pinecone-database/pinecone";
-import {LLMChain} from "langchain/chains";
-import {OpenAIEmbeddings} from "langchain/embeddings";
-import {OpenAI} from "langchain/llms";
-import {PromptTemplate} from "langchain/prompts";
+import { ChatBody, Message } from '@/types/chat';
 
-// @ts-expect-error
-import wasm from '../../node_modules/@dqbd/tiktoken/lite/tiktoken_bg.wasm?module';
+import { Metadata, getMatchesFromEmbeddings } from '@/pages/api/matches';
+import { summarizeLongDocument } from '@/pages/api/summarizer';
+import { templates } from '@/pages/api/templates';
 
-export const config = {
-  runtime: 'edge',
-};
+import { TiktokenModel, encoding_for_model } from '@dqbd/tiktoken';
+import { PineconeClient } from '@pinecone-database/pinecone';
+import { LLMChain } from 'langchain/chains';
+import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
+import { OpenAI } from 'langchain/llms/openai';
+import { PromptTemplate } from 'langchain/prompts';
+
 
 const llm = new OpenAI({});
 let pinecone: PineconeClient | null = null;
@@ -32,22 +28,18 @@ const initPineconeClient = async () => {
   });
 };
 
-
-const handler = async (req: Request): Promise<Response> => {
+const handler = async (req: NextApiRequest, res: NextApiResponse) => {
   try {
     if (!pinecone) {
       await initPineconeClient();
     }
 
-    const { model, messages, key, prompt, temperature } = (await req.json()) as ChatBody;
+    console.log('body', req.body);
 
-    await init((imports) => WebAssembly.instantiate(wasm, imports));
-    const encoding = new Tiktoken(
-      tiktokenModel.bpe_ranks,
-      tiktokenModel.special_tokens,
-      tiktokenModel.pat_str,
-    );
+    const { model, messages, prompt, temperature } = req.body as ChatBody;
 
+    console.log('messages', messages);
+    const encoding = encoding_for_model(model.id as TiktokenModel);
 
     // Build an LLM chain that will improve the user prompt
     const inquiryChain = new LLMChain({
@@ -57,7 +49,10 @@ const handler = async (req: Request): Promise<Response> => {
         inputVariables: ['userPrompt', 'conversationHistory'],
       }),
     });
-    const inquiryChainResult = await inquiryChain.call({ userPrompt: prompt, conversationHistory: messages.map(m => m.content) });
+    const inquiryChainResult = await inquiryChain.call({
+      userPrompt: prompt,
+      conversationHistory: messages.map((m) => m.content),
+    });
     const inquiry = inquiryChainResult.text;
 
     // Embed the user's intent and query the Pinecone index
@@ -80,12 +75,11 @@ const handler = async (req: Request): Promise<Response> => {
             const metadata = match.metadata as Metadata;
             const { url } = metadata;
             return url;
-          })
-        )
+          }),
+        ),
       );
 
     console.log(urls);
-
 
     const fullDocuments =
       matches &&
@@ -97,7 +91,7 @@ const handler = async (req: Request): Promise<Response> => {
             map.set(url, text);
           }
           return map;
-        }, new Map())
+        }, new Map()),
       ).map(([_, text]) => text);
 
     const chunkedDocs =
@@ -108,30 +102,31 @@ const handler = async (req: Request): Promise<Response> => {
             const metadata = match.metadata as Metadata;
             const { chunk } = metadata;
             return chunk;
-          })
-        )
+          }),
+        ),
       );
-
 
     let temperatureToUse = temperature;
     if (temperatureToUse == null) {
       temperatureToUse = DEFAULT_TEMPERATURE;
     }
 
-    const promptQA = PromptTemplate.fromTemplate(
-      templates.qaTemplate
+    const promptQA = PromptTemplate.fromTemplate(templates.qaTemplate);
+
+    const summary = await summarizeLongDocument(
+      fullDocuments!.join('\n'),
+      inquiry,
+      () => {
+        console.log('onSummaryDone');
+      },
     );
 
-    const summary = await summarizeLongDocument(fullDocuments!.join('\n'), inquiry, () => {
-      console.log('onSummaryDone');
-    });
-
-    const promptToSend= await promptQA.format({
+    const promptToSend = await promptQA.format({
       summaries: summary,
       question: prompt,
-      conversationHistory: messages.map(m => m.content),
+      conversationHistory: messages.map((m) => m.content),
       urls,
-    })
+    });
 
     const prompt_tokens = encoding.encode(promptToSend);
 
@@ -151,9 +146,42 @@ const handler = async (req: Request): Promise<Response> => {
 
     encoding.free();
 
-    const stream = await OpenAIStream(model, promptToSend, temperatureToUse, key, messagesToSend);
+    const key = process.env.OPENAI_API_KEY!;
 
-    return new Response(stream);
+    const stream: ReadableStream = await OpenAIStream(
+      model,
+      promptToSend,
+      temperatureToUse,
+      key,
+      messagesToSend,
+    );
+
+    // Set appropriate headers for a stream
+    res.setHeader('Content-Type', 'text/plain'); // Set your Content-Type based on your stream data type
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    // Get a reader from the stream
+    const reader = stream.getReader();
+
+    // Read the stream and write data to the response
+    const readAndWrite = async () => {
+      const { value, done } = await reader.read();
+      if (done) {
+        // If stream is finished, end the response
+        res.end();
+        return;
+      }
+
+      // If stream is not finished, write chunk and recursively read the next
+      res.write(value);
+      readAndWrite();
+    };
+
+    readAndWrite().catch((err) => {
+      // Log error and send error status
+      console.error(err);
+      res.status(500).end('An error occurred while streaming data.');
+    });
   } catch (error) {
     console.error(error);
     if (error instanceof OpenAIError) {

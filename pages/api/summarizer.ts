@@ -1,8 +1,14 @@
-import { LLMChain, PromptTemplate } from 'langchain';
-import { OpenAI } from 'langchain/llms';
 import { templates } from './templates';
 
-const llm = new OpenAI({ concurrency: 10, temperature: 0, modelName: 'gpt-3.5-turbo' });
+import { LLMChain } from 'langchain/chains';
+import { OpenAI } from 'langchain/llms/openai';
+import { PromptTemplate } from 'langchain/prompts';
+
+const llm = new OpenAI({
+  concurrency: 10,
+  temperature: 0,
+  modelName: 'gpt-3.5-turbo',
+});
 const template = templates.summarizerTemplate;
 
 const promptTemplate = new PromptTemplate({
@@ -12,10 +18,16 @@ const promptTemplate = new PromptTemplate({
 
 const chunkSubstr = (str: string, size: number) => {
   const numChunks = Math.ceil(str.length / size);
-  return Array.from({ length: numChunks }, (_, i) => str.substring(i * size, (i + 1) * size));
+  return Array.from({ length: numChunks }, (_, i) =>
+    str.substring(i * size, (i + 1) * size),
+  );
 };
 
-const summarize = async (document: string, inquiry: string, onSummaryDone: Function) => {
+const summarize = async (
+  document: string,
+  inquiry: string,
+  onSummaryDone: Function,
+) => {
   const chain = new LLMChain({
     prompt: promptTemplate,
     llm,
@@ -35,7 +47,11 @@ const summarize = async (document: string, inquiry: string, onSummaryDone: Funct
   }
 };
 
-const summarizeLongDocument = async (document: string, inquiry: string, onSummaryDone: Function): Promise<string> => {
+const summarizeLongDocument = async (
+  document: string,
+  inquiry: string,
+  onSummaryDone: Function,
+): Promise<string> => {
   // Chunk document into 4000 character chunks
   try {
     if (document.length > 3000) {
