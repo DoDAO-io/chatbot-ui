@@ -2,7 +2,8 @@ import { NextApiRequest, NextApiResponse } from 'next';
 
 import { DEFAULT_TEMPERATURE } from '@/utils/app/const';
 import { OpenAIError, OpenAIStream } from '@/utils/server';
-
+import { ChatOpenAI } from 'langchain/chat_models';
+import { CallbackManager } from 'langchain/callbacks';
 import { ChatBody, Message } from '@/types/chat';
 
 import { Metadata, getMatchesFromEmbeddings } from '@/pages/api/matches';
@@ -15,7 +16,7 @@ import { LLMChain } from 'langchain/chains';
 import { OpenAIEmbeddings } from 'langchain/embeddings/openai';
 import { OpenAI } from 'langchain/llms/openai';
 import { PromptTemplate } from 'langchain/prompts';
-
+import { uuid } from 'uuidv4';
 
 const llm = new OpenAI({});
 let pinecone: PineconeClient | null = null;
@@ -34,39 +35,18 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
       await initPineconeClient();
     }
 
-    console.log('body', req.body);
-
     const { model, messages, prompt, temperature } = req.body as ChatBody;
-
-    console.log('messages', messages);
     const encoding = encoding_for_model(model.id as TiktokenModel);
-
-    // Build an LLM chain that will improve the user prompt
-    const inquiryChain = new LLMChain({
-      llm,
-      prompt: new PromptTemplate({
-        template: templates.inquiryTemplate,
-        inputVariables: ['userPrompt', 'conversationHistory'],
-      }),
-    });
-    const inquiryChainResult = await inquiryChain.call({
-      userPrompt: prompt,
-      conversationHistory: messages.map((m) => m.content),
-    });
-    const inquiry = inquiryChainResult.text;
 
     // Embed the user's intent and query the Pinecone index
     const embedder = new OpenAIEmbeddings();
 
-    const embeddings = await embedder.embedQuery(inquiry);
+    const embeddings = await embedder.embedQuery(messages[messages.length-1].content);
 
     console.log('embeddings', embeddings.length);
     const matches = await getMatchesFromEmbeddings(embeddings, pinecone!, 3);
 
     console.log('matches', matches.length);
-
-    // const urls = docs && Array.from(new Set(docs.map(doc => doc.metadata.url)))
-
     const urls =
       matches &&
       Array.from(
@@ -88,11 +68,28 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
           const metadata = match.metadata as Metadata;
           const { text, url } = metadata;
           if (!map.has(url)) {
-            map.set(url, text);
+            map.set(url, text);   
           }
           return map;
         }, new Map()),
       ).map(([_, text]) => text);
+
+      let documentTokens = 0;
+      if (fullDocuments) {
+          for (let doc of fullDocuments) {
+              documentTokens += encoding.encode(doc).length;
+          }
+      }
+    
+    if(documentTokens > 14000){
+      const summary = await summarizeLongDocument(
+          fullDocuments!.join('\n'),
+          messages[messages.length-1].content,
+          () => {
+            console.log('onSummaryDone');
+          },
+        );
+    }
 
     const chunkedDocs =
       matches &&
@@ -112,27 +109,23 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
     }
 
     const promptQA = PromptTemplate.fromTemplate(templates.qaTemplate);
-
-    const summary = await summarizeLongDocument(
-      fullDocuments!.join('\n'),
-      inquiry,
-      () => {
-        console.log('onSummaryDone');
-      },
-    );
-
+    
+   
+    
     const promptToSend = await promptQA.format({
-      summaries: summary,
+      summaries: fullDocuments!.join('\n'),
       question: prompt,
       conversationHistory: messages.map((m) => m.content),
       urls,
     });
+    
 
     const prompt_tokens = encoding.encode(promptToSend);
 
     let tokenCount = prompt_tokens.length;
-    let messagesToSend: Message[] = [];
+    let conversationHistory: Message[] = [];
 
+   
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i];
       const tokens = encoding.encode(message.content);
@@ -141,47 +134,44 @@ const handler = async (req: NextApiRequest, res: NextApiResponse) => {
         break;
       }
       tokenCount += tokens.length;
-      messagesToSend = [message, ...messagesToSend];
+      conversationHistory = [message, ...conversationHistory];
     }
 
     encoding.free();
 
-    const key = process.env.OPENAI_API_KEY!;
-
-    const stream: ReadableStream = await OpenAIStream(
-      model,
-      promptToSend,
-      temperatureToUse,
-      key,
-      messagesToSend,
-    );
-
-    // Set appropriate headers for a stream
-    res.setHeader('Content-Type', 'text/plain'); // Set your Content-Type based on your stream data type
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    // Get a reader from the stream
-    const reader = stream.getReader();
-
-    // Read the stream and write data to the response
-    const readAndWrite = async () => {
-      const { value, done } = await reader.read();
-      if (done) {
-        // If stream is finished, end the response
-        res.end();
-        return;
-      }
-
-      // If stream is not finished, write chunk and recursively read the next
-      res.write(value);
-      readAndWrite();
-    };
-
-    readAndWrite().catch((err) => {
-      // Log error and send error status
-      console.error(err);
-      res.status(500).end('An error occurred while streaming data.');
+    const promptTemplate = new PromptTemplate({
+      template: templates.qaTemplate,
+      inputVariables: ['summaries', 'question', 'conversationHistory', 'urls'],
     });
+
+
+    const key = process.env.OPENAI_API_KEY!;
+    const chat = new ChatOpenAI({
+      streaming: true,
+      verbose: true,
+      modelName: 'gpt-3.5-turbo-16k',
+      callbackManager: CallbackManager.fromHandlers({
+        async handleLLMNewToken(token) {
+          console.log(token);
+          res.write(token);
+        },
+        async handleLLMEnd(result) {
+          res.end();
+        },
+      }),
+    });
+    const chain = new LLMChain({
+      prompt: promptTemplate,
+      llm: chat,
+    });
+
+    await chain.call({
+      summaries: fullDocuments!.join('\n'),
+      question: promptToSend,
+      conversationHistory,
+      urls,
+    });
+    
   } catch (error) {
     console.error(error);
     if (error instanceof OpenAIError) {

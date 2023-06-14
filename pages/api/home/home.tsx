@@ -259,7 +259,7 @@ const Home = ({
       });
     }
 
-    const apiKey = localStorage.getItem('apiKey');
+    const apiKey = process.env.OPENAI_API_KEY ; 
 
     if (serverSideApiKeyIsSet) {
       dispatch({ field: 'apiKey', value: '' });
